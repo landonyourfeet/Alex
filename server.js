@@ -163,16 +163,11 @@ const TOOLS = {
       const page = await browser.newPage();
       // Log in as Alex Reeves
       await page.goto('https://app.followupboss.com/2/login', { waitUntil: 'networkidle2' });
-      // Debug: log all input fields found on login page
-      const inputs = await page.evaluate(() =>
-        [...document.querySelectorAll('input')].map(i => ({ id: i.id, name: i.name, type: i.type, placeholder: i.placeholder }))
-      );
-      console.log('[Puppeteer] Login page inputs:', JSON.stringify(inputs));
-      // Try to fill email field
-      await page.waitForSelector('input[type="email"], input[name="email"], input[placeholder*="Email" i], input[placeholder*="email" i]', { timeout: 10000 });
-      await page.type('input[type="email"], input[name="email"], input[placeholder*="Email" i], input[placeholder*="email" i]', process.env.ALEX_FUB_EMAIL || 'support@okcreal.com');
-      await page.type('input[type="password"], input[name="password"]', process.env.ALEX_FUB_PASSWORD);
-      await page.click('button[type="submit"]');
+      // Log in using exact FUB selectors (confirmed via debug)
+      await page.waitForSelector('#email', { timeout: 10000 });
+      await page.type('#email', process.env.ALEX_FUB_EMAIL || 'support@okcreal.com');
+      await page.type('#Password', process.env.ALEX_FUB_PASSWORD);
+      await page.click('[type="submit"]');
       await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
 
       // Navigate to the contact
