@@ -647,14 +647,14 @@ async function registerWebhook() {
   const webhookUrl = SERVER_URL + '/fub-webhook';
   try {
     // First check if webhook already exists
-    const listRes = await fub.get('/v1/webhooks');
+    const listRes = await fub.get('/webhooks');
     const existing = (listRes.data.webhooks || []).find(w => w.url === webhookUrl);
     if (existing) {
       console.log('Webhook already registered:', webhookUrl);
       return;
     }
     // Register new webhook
-    await fub.post('/v1/webhooks', {
+    await fub.post('/webhooks', {
       url: webhookUrl,
       system: 'Alex Reeves AI',
       events: ['note.created', 'textMessage.received'],
