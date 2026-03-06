@@ -163,32 +163,40 @@ const TOOLS = {
       const page = await browser.newPage();
       // Log in as Alex Reeves
       await page.goto('https://app.followupboss.com/2/login', { waitUntil: 'networkidle2' });
-      await page.type('#email', process.env.ALEX_FUB_EMAIL || 'support@okcreal.com');
-      await page.type('#password', process.env.ALEX_FUB_PASSWORD);
-      await page.click('[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'networkidle2' });
+      // Debug: log all input fields found on login page
+      const inputs = await page.evaluate(() =>
+        [...document.querySelectorAll('input')].map(i => ({ id: i.id, name: i.name, type: i.type, placeholder: i.placeholder }))
+      );
+      console.log('[Puppeteer] Login page inputs:', JSON.stringify(inputs));
+      // Try to fill email field
+      await page.waitForSelector('input[type="email"], input[name="email"], input[placeholder*="Email" i], input[placeholder*="email" i]', { timeout: 10000 });
+      await page.type('input[type="email"], input[name="email"], input[placeholder*="Email" i], input[placeholder*="email" i]', process.env.ALEX_FUB_EMAIL || 'support@okcreal.com');
+      await page.type('input[type="password"], input[name="password"]', process.env.ALEX_FUB_PASSWORD);
+      await page.click('button[type="submit"]');
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
 
       // Navigate to the contact
       await page.goto(`https://app.followupboss.com/2/people/view/${personId}`, { waitUntil: 'networkidle2' });
+      await page.waitForTimeout(2000);
 
-      // Click the Text tab
-      await page.waitForSelector('[data-action="text"], a[href*="text"], button:has-text("Text")', { timeout: 10000 });
-      const textBtn = await page.$x('//button[contains(text(),"Text")] | //a[contains(text(),"Text")]');
-      if (textBtn.length) await textBtn[0].click();
-      else await page.click('[data-tab="text"], [href*="#text"]');
+      // Click the Text tab — try multiple selectors
+      try {
+        const [textTab] = await page.$x('//a[normalize-space()="Text"] | //button[normalize-space()="Text"] | //span[normalize-space()="Text"]/..');
+        if (textTab) await textTab.click();
+      } catch(e) {
+        await page.click('[data-tab="text"], [href*="text"], [class*="text-tab"]');
+      }
+      await page.waitForTimeout(1500);
 
-      await page.waitForTimeout(1000);
+      // Type the message into whatever textarea/contenteditable is visible
+      await page.waitForSelector('textarea:not([style*="display: none"]), [contenteditable="true"]', { timeout: 8000 });
+      await page.focus('textarea:not([style*="display: none"]), [contenteditable="true"]');
+      await page.keyboard.type(message);
 
-      // Type the message
-      await page.waitForSelector('textarea, [contenteditable="true"]', { timeout: 8000 });
-      const textarea = await page.$('textarea') || await page.$('[contenteditable="true"]');
-      await textarea.click();
-      await textarea.type(message);
-
-      // Send it
-      const sendBtn = await page.$x('//button[contains(text(),"Send")]');
-      if (sendBtn.length) {
-        await sendBtn[0].click();
+      // Click Send button
+      const [sendBtn] = await page.$x('//button[normalize-space()="Send"]');
+      if (sendBtn) {
+        await sendBtn.click();
       } else {
         await page.keyboard.press('Enter');
       }
