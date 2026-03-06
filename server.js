@@ -439,7 +439,10 @@ Respond JSON only:
 // ══════════════════════════════════════════════════════════════════════════════
 
 function mentionsAlex(text = '') {
-  return /@alex\b/i.test(text);
+  // Match plain @alex, @Alex Reeves, or FUB's HTML span mention format
+  return /@alex\b/i.test(text) ||
+         /alex reeves/i.test(text) ||
+         /data-user-id="50"/i.test(text);
 }
 
 function extractInstruction(text = '') {
