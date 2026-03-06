@@ -232,6 +232,7 @@ const TOOLS = {
   log_call: async ({ personId, note, outcome = 'no_answer', durationSeconds = 0 }) => {
     await fub.post('/calls', {
       personId,
+      userId: alexUserId,
       note,
       outcome,
       durationSeconds,
@@ -355,8 +356,13 @@ Person ID (for all FUB API calls): ${personId}
 ${TOOL_SCHEMAS}
 
 Based on the instruction and lead context, decide which tools to call and in what order.
-Be thorough — if the instruction implies multiple actions, do all of them.
 Write natural, warm, professional messages that sound like a real helpful person, not a bot.
+
+STRICT RULES:
+- post_note may appear AT MOST ONCE in your actions list — one clean summary note only
+- Do not post multiple notes under any circumstances
+- The completionNote is your ONE note — keep it to 1-2 sentences summarizing what you did
+- Do not sign off with "Alex Reeves (AI)" in every sentence — just once at the end of the completionNote
 
 Respond ONLY with a JSON object (no markdown):
 {
@@ -365,7 +371,7 @@ Respond ONLY with a JSON object (no markdown):
     { "tool": "tool_name", "params": { ... } },
     ...
   ],
-  "completionNote": "The note Alex will post back to the team after completing the tasks (mention @[requesterName] if known)"
+  "completionNote": "1-2 sentence summary of what Alex did. — Alex Reeves (AI)"
 }` }],
       max_tokens: 1200,
     }, { headers: { Authorization: 'Bearer ' + XAI_API_KEY, 'Content-Type': 'application/json' } });
