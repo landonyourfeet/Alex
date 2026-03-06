@@ -155,10 +155,22 @@ const TOOLS = {
   // Send an SMS by controlling FUB's native UI as Alex (bypasses API restrictions)
   send_text: async ({ personId, message }) => {
     const puppeteer = require('puppeteer');
+    console.log('[Puppeteer] Launching browser, password set:', !!process.env.ALEX_FUB_PASSWORD);
     const browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-extensions',
+      ],
     });
+    console.log('[Puppeteer] Browser launched successfully');
     try {
       const page = await browser.newPage();
       // Log in as Alex Reeves
@@ -562,7 +574,7 @@ async function handleMention(noteBody, personId, authorName = 'Team') {
       console.log('[Alex]', result);
     } catch (e) {
       results.push('✗ ' + action.tool + ' failed: ' + e.message);
-      console.error('[Alex] Tool error:', action.tool, e.message);
+      console.error('[Alex] Tool error:', action.tool, e.message, e.stack?.split('\n').slice(0,3).join(' | '));
     }
   }
 
