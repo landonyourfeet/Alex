@@ -672,34 +672,6 @@ app.get('/health', (req, res) =>
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) + 's' })
 );
 
-// ─── Start ────────────────────────────────────────────────────────────────
-async function registerWebhook() {
-  const webhookUrl = SERVER_URL + '/fub-webhook';
-  try {
-    // First check if webhook already exists
-    const listRes = await fub.get('/webhooks');
-    const existing = (listRes.data.webhooks || []).find(w => w.url === webhookUrl);
-    if (existing) {
-      console.log('Webhook already registered:', webhookUrl);
-      return;
-    }
-    // Register new webhook
-    await ownerFub.post('/webhooks', {
-      url: webhookUrl,
-      system: 'Alex Reeves AI',
-      events: ['note.created', 'textMessage.received'],
-    }, {
-      headers: {
-        'X-System': 'Alex Reeves AI',
-        'X-System-Key': ownerKey,
-      }
-    });
-    console.log('✅ Webhook registered:', webhookUrl);
-  } catch (err) {
-    console.error('Webhook registration failed:', err.response?.data || err.message);
-  }
-}
-
 app.listen(PORT, async () => {
   console.log('\nAlex Reeves | AI Team Member | OKC Real');
   console.log('Port:', PORT);
