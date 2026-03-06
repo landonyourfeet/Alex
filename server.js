@@ -672,10 +672,53 @@ app.get('/health', (req, res) =>
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) + 's' })
 );
 
+// ─── Polling: check FUB every 10 seconds for new @alex notes ──────────────
+const processedNoteIds = new Set();
+
+async function pollForAlexMentions() {
+  try {
+    // Fetch the 25 most recent notes across all people
+    const res = await fub.get('/notes', {
+      params: { limit: 25, sort: '-created' }
+    });
+    const notes = res.data?.notes || [];
+
+    for (const note of notes) {
+      const noteId   = String(note.id);
+      const body     = note.body || '';
+      const personId = note.personId ? String(note.personId) : null;
+
+      // Skip if already processed or doesn't mention @alex
+      if (processedNoteIds.has(noteId)) continue;
+      if (!mentionsAlex(body)) continue;
+      if (!personId) continue;
+
+      // Mark processed immediately to avoid double-processing
+      processedNoteIds.add(noteId);
+      // Keep set from growing forever
+      if (processedNoteIds.size > 500) {
+        const first = processedNoteIds.values().next().value;
+        processedNoteIds.delete(first);
+      }
+
+      const authorName = note.createdBy?.name || 'Team';
+      console.log(`[Alex] @mention found — Note ${noteId}, Person ${personId}, by ${authorName}`);
+      handleMention(body, personId, authorName).catch(e =>
+        console.error('[Alex] handleMention error:', e.message)
+      );
+    }
+  } catch (e) {
+    // Silently ignore transient API errors
+    if (e.response?.status !== 429) {
+      console.error('[Alex] Poll error:', e.message);
+    }
+  }
+}
+
 app.listen(PORT, async () => {
   console.log('\nAlex Reeves | AI Team Member | OKC Real');
   console.log('Port:', PORT);
-  console.log('FUB Webhook:', SERVER_URL + '/fub-webhook');
+  console.log('Mode: Polling every 10 seconds for @alex mentions');
   console.log('');
   console.log('Tools: send_text, send_email, post_note, update_tags,');
   console.log('       update_stage, assign_agent, create_task,');
@@ -683,4 +726,15 @@ app.listen(PORT, async () => {
   console.log('');
   console.log('Usage: @alex [any instruction] in any FUB note\n');
   await getAlexUserId();
+
+  // Seed processed set with existing notes so we don't re-process old ones on startup
+  try {
+    const res = await fub.get('/notes', { params: { limit: 25, sort: '-created' } });
+    (res.data?.notes || []).forEach(n => processedNoteIds.add(String(n.id)));
+    console.log(`[Alex] Seeded ${processedNoteIds.size} existing notes — polling started.`);
+  } catch(e) {
+    console.error('[Alex] Seed error:', e.message);
+  }
+
+  setInterval(pollForAlexMentions, 10000);
 });
