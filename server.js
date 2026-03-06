@@ -639,6 +639,35 @@ app.get('/', (req, res) => {
   });
 });
 
+
+// ─── One-time setup endpoint ──────────────────────────────────────────────
+// Visit https://alex-production-1d3b.up.railway.app/setup to register webhook
+app.get('/setup', async (req, res) => {
+  const webhookUrl = SERVER_URL + '/fub-webhook';
+  const ownerKey = OWNER_FUB_API_KEY || ALEX_FUB_API_KEY;
+  const ownerFub = axios.create({
+    baseURL: 'https://api.followupboss.com/v1',
+    auth: { username: ownerKey, password: '' },
+    headers: { 'Content-Type': 'application/json', 'X-System': 'Alex Reeves AI', 'X-System-Key': ownerKey },
+  });
+  try {
+    const listRes = await ownerFub.get('/webhooks');
+    const existing = (listRes.data.webhooks || []).find(w => w.url === webhookUrl);
+    if (existing) {
+      return res.json({ status: 'already registered', webhook: webhookUrl });
+    }
+    await ownerFub.post('/webhooks', {
+      url: webhookUrl,
+      system: 'Alex Reeves AI',
+      events: ['note.created', 'textMessage.received'],
+    });
+    console.log('Webhook registered via /setup:', webhookUrl);
+    res.json({ status: 'registered!', webhook: webhookUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', uptime: Math.round(process.uptime()) + 's' })
 );
@@ -682,5 +711,4 @@ app.listen(PORT, async () => {
   console.log('');
   console.log('Usage: @alex [any instruction] in any FUB note\n');
   await getAlexUserId();
-  await registerWebhook();
 });
