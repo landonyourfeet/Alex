@@ -54,6 +54,13 @@ const fub = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Owner client used for actions that require elevated permissions (e.g. sending texts)
+const fubOwner = axios.create({
+  baseURL: 'https://api.followupboss.com/v1',
+  auth:    { username: OWNER_FUB_API_KEY || ALEX_FUB_API_KEY, password: '' },
+  headers: { 'Content-Type': 'application/json' },
+});
+
 // ─── Active follow-up tasks Alex is managing ──────────────────────────────
 const activeTasks = new Map(); // taskId → task object
 let alexUserId    = null;
@@ -147,7 +154,7 @@ const TOOLS = {
 
   // Send an SMS through FUB's built-in messaging
   send_text: async ({ personId, message }) => {
-    await fub.post('/textMessages', { personId, message, isIncoming: false });
+    await fubOwner.post('/textMessages', { personId, message, isIncoming: false });
     return `Sent text to person ${personId}: "${message.slice(0, 60)}..."`;
   },
 
