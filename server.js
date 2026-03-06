@@ -491,7 +491,14 @@ async function handleMention(noteBody, personId, authorName = 'Team') {
   console.log('[Alex] Plan:', plan.thinking);
   console.log('[Alex] Actions:', plan.actions.map(a => a.tool).join(', '));
 
-  // 3. Execute each action in sequence
+  // 3. Enforce max 1 post_note (code-level safeguard, not just prompt)
+  let notesSeen = 0;
+  plan.actions = plan.actions.filter(a => {
+    if (a.tool === 'post_note') { notesSeen++; return notesSeen <= 1; }
+    return true;
+  });
+
+  // 4. Execute each action in sequence
   const results = [];
   for (const action of plan.actions) {
     const toolFn = TOOLS[action.tool];
@@ -702,6 +709,8 @@ async function pollForAlexMentions() {
       if (processedNoteIds.has(noteId)) continue;
       if (!mentionsAlex(body)) continue;
       if (!personId) continue;
+      // CRITICAL: never process notes written by Alex himself (prevents infinite loop)
+      if (note.createdById === 50 || note.createdBy?.id === 50) continue;
 
       // Mark processed immediately to avoid double-processing
       processedNoteIds.add(noteId);
