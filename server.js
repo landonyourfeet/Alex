@@ -40,9 +40,10 @@ const app = express();
 app.use(express.json());
 
 const {
-  PORT           = 3001,
+  PORT             = 3001,
   ALEX_FUB_API_KEY,
-  SERVER_URL     = 'http://localhost:3001',
+  OWNER_FUB_API_KEY,
+  SERVER_URL       = 'http://localhost:3001',
   XAI_API_KEY,
 } = process.env;
 
@@ -654,14 +655,14 @@ async function registerWebhook() {
       return;
     }
     // Register new webhook
-    await fub.post('/webhooks', {
+    await ownerFub.post('/webhooks', {
       url: webhookUrl,
       system: 'Alex Reeves AI',
       events: ['note.created', 'textMessage.received'],
     }, {
       headers: {
         'X-System': 'Alex Reeves AI',
-        'X-System-Key': ALEX_FUB_API_KEY,
+        'X-System-Key': ownerKey,
       }
     });
     console.log('✅ Webhook registered:', webhookUrl);
