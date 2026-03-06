@@ -147,8 +147,7 @@ const TOOLS = {
 
   // Send an SMS through FUB's built-in messaging
   send_text: async ({ personId, message }) => {
-    // Always send from the OKC Real resident support line
-    await fub.post('/textMessages', { personId, message, isIncoming: false, phoneNumberFrom: '+14052561696' });
+    await fub.post('/textMessages', { personId, message, isIncoming: false });
     return `Sent text to person ${personId}: "${message.slice(0, 60)}..."`;
   },
 
