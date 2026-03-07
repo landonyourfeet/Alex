@@ -173,27 +173,44 @@ const TOOLS = {
     console.log('[Puppeteer] Browser launched successfully');
     try {
       const page = await browser.newPage();
-      // Log in as Alex Reeves
-      await page.goto('https://app.followupboss.com/2/login', { waitUntil: 'networkidle2' });
-      // Log in using exact FUB selectors (confirmed via debug)
-      await page.waitForSelector('#email', { timeout: 10000 });
-      await page.type('#email', process.env.ALEX_FUB_EMAIL || 'support@okcreal.com');
-      await page.type('#Password', process.env.ALEX_FUB_PASSWORD);
-      await page.click('[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
 
-      // Navigate to the contact
+      // ── Log in as Alex Reeves ──────────────────────────────────────────
+      await page.goto('https://app.followupboss.com/2/login', { waitUntil: 'networkidle2' });
+
+      await page.waitForSelector('#email', { timeout: 10000 });
+      await page.type('#email', process.env.ALEX_FUB_EMAIL || '');
+
+      // FUB uses lowercase #password — fall back to #Password just in case
+      await page.waitForSelector('#password, #Password', { timeout: 5000 });
+      const pwField = await page.$('#password') || await page.$('#Password');
+      if (!pwField) throw new Error('Could not find password field on FUB login page');
+      await pwField.type(process.env.ALEX_FUB_PASSWORD || '');
+
+      await page.click('[type="submit"]');
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+
+      // Verify login actually succeeded
+      const currentUrl = page.url();
+      if (currentUrl.includes('/login')) {
+        throw new Error(
+          'FUB login failed — still on login page. ' +
+          'Check ALEX_FUB_EMAIL and ALEX_FUB_PASSWORD env vars.'
+        );
+      }
+      console.log('[Puppeteer] Login successful, current URL:', currentUrl);
+
+      // ── Navigate to the contact ────────────────────────────────────────
       await page.goto(`https://app.followupboss.com/2/people/view/${personId}`, { waitUntil: 'networkidle2' });
-      await page.waitForTimeout(2000);
+      await new Promise(r => setTimeout(r, 2000));
 
       // Click the Text tab — try multiple selectors
       try {
         const [textTab] = await page.$x('//a[normalize-space()="Text"] | //button[normalize-space()="Text"] | //span[normalize-space()="Text"]/..');
         if (textTab) await textTab.click();
-      } catch(e) {
+      } catch (e) {
         await page.click('[data-tab="text"], [href*="text"], [class*="text-tab"]');
       }
-      await page.waitForTimeout(1500);
+      await new Promise(r => setTimeout(r, 1500));
 
       // Type the message into whatever textarea/contenteditable is visible
       await page.waitForSelector('textarea:not([style*="display: none"]), [contenteditable="true"]', { timeout: 8000 });
@@ -207,7 +224,8 @@ const TOOLS = {
       } else {
         await page.keyboard.press('Enter');
       }
-      await page.waitForTimeout(2000);
+      await new Promise(r => setTimeout(r, 2000));
+
       return `Sent text to person ${personId} via FUB native UI: "${message.slice(0, 60)}"`;
     } finally {
       await browser.close();
@@ -251,7 +269,6 @@ const TOOLS = {
 
   // Assign lead to a specific agent
   assign_agent: async ({ personId, agentName }) => {
-    // Find the agent user ID by name
     const { data: users } = await fub.get('/users', { params: { limit: 50 } });
     const agent = (users.users || []).find(
       u => u.name?.toLowerCase().includes(agentName.toLowerCase())
@@ -508,7 +525,6 @@ Respond JSON only:
 // ══════════════════════════════════════════════════════════════════════════════
 
 function mentionsAlex(text = '') {
-  // Match plain @alex, @Alex Reeves, or FUB's HTML span mention format
   return /@alex\b/i.test(text) ||
          /alex reeves/i.test(text) ||
          /data-user-id="50"/i.test(text);
@@ -578,7 +594,7 @@ async function handleMention(noteBody, personId, authorName = 'Team') {
     }
   }
 
-  // 4. Post completion note back to FUB so the team sees what Alex did
+  // 5. Post completion note back to FUB so the team sees what Alex did
   if (plan.completionNote) {
     await TOOLS.post_note({
       personId,
@@ -615,7 +631,6 @@ async function handleIncomingText(event) {
   }
 
   if (evaluation.complete) {
-    // Task done — post update for the team
     await TOOLS.post_note({
       personId,
       body:
@@ -625,7 +640,6 @@ async function handleIncomingText(event) {
     activeTasks.delete(task.id);
     console.log('[Alex] Task', task.id, 'completed.');
   } else {
-    // Keep pursuing
     task.lastSentAt = Date.now();
     scheduleNextFollowUp(task);
   }
@@ -635,12 +649,8 @@ async function handleIncomingText(event) {
 // WEBHOOK ROUTES
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Main FUB webhook endpoint
-// In FUB: Admin → API → Webhooks → Add Webhook
-// URL: https://your-railway-url/fub-webhook
-// Subscribe to: note.created, textMessage.received, email.received
 app.post('/fub-webhook', async (req, res) => {
-  res.sendStatus(200); // Respond immediately
+  res.sendStatus(200);
 
   const event    = req.body;
   const type     = event?.type || event?.event || '';
@@ -661,7 +671,6 @@ app.post('/fub-webhook', async (req, res) => {
 });
 
 // ─── Manual test endpoint ──────────────────────────────────────────────────
-// POST /mention {"personId":"12345","instruction":"text this lead about their tour","authorName":"Landon"}
 app.post('/mention', async (req, res) => {
   const { personId, instruction, authorName = 'Team' } = req.body;
   if (!personId || !instruction) {
@@ -718,9 +727,7 @@ app.get('/', (req, res) => {
   });
 });
 
-
-// ─── One-time setup endpoint ──────────────────────────────────────────────
-// Visit https://alex-production-1d3b.up.railway.app/setup to register webhook
+// ─── One-time setup endpoint ───────────────────────────────────────────────
 app.get('/setup', async (req, res) => {
   const webhookUrl = SERVER_URL + '/fub-webhook';
   const ownerKey = OWNER_FUB_API_KEY || ALEX_FUB_API_KEY;
@@ -756,7 +763,6 @@ const processedNoteIds = new Set();
 
 async function pollForAlexMentions() {
   try {
-    // Fetch the 25 most recent notes across all people
     const res = await fub.get('/notes', {
       params: { limit: 25, sort: '-created' }
     });
@@ -767,14 +773,12 @@ async function pollForAlexMentions() {
       const body     = note.body || '';
       const personId = note.personId ? String(note.personId) : null;
 
-      // Skip if already processed or doesn't mention @alex
       if (processedNoteIds.has(noteId)) continue;
       if (!mentionsAlex(body)) continue;
       if (!personId) continue;
       // CRITICAL: never process notes written by Alex himself (prevents infinite loop)
       if (note.createdById === 50 || note.createdBy?.id === 50) continue;
 
-      // Mark processed immediately to avoid double-processing
       processedNoteIds.add(noteId);
       // Keep set from growing forever
       if (processedNoteIds.size > 500) {
@@ -789,7 +793,6 @@ async function pollForAlexMentions() {
       );
     }
   } catch (e) {
-    // Silently ignore transient API errors
     if (e.response?.status !== 429) {
       console.error('[Alex] Poll error:', e.message);
     }
