@@ -186,14 +186,23 @@ const TOOLS = {
       if (!pwField) throw new Error('Could not find password field on FUB login page');
       await pwField.type(process.env.ALEX_FUB_PASSWORD || '');
 
-      await page.click('[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 });
+      // Click submit and wait for URL to change away from /login (handles SPA redirects)
+      await Promise.all([
+        page.click('[type="submit"]'),
+        page.waitForFunction(
+          () => !window.location.href.includes('/login'),
+          { timeout: 30000 }
+        ).catch(() => null), // don't throw here — we check URL manually below
+      ]);
+
+      // Give the SPA a moment to fully settle
+      await new Promise(r => setTimeout(r, 3000));
 
       // Verify login actually succeeded
       const currentUrl = page.url();
       if (currentUrl.includes('/login')) {
         throw new Error(
-          'FUB login failed — still on login page. ' +
+          'FUB login failed — still on login page after 30s. ' +
           'Check ALEX_FUB_EMAIL and ALEX_FUB_PASSWORD env vars.'
         );
       }
